@@ -141,15 +141,12 @@ def run_genetic(
         population = performSelection(mutatedPopulation, populationSize, fitnessScores, selectionType)
 
         bestIndividualFitnessScore = max(fitnessScores)
-        # bestIndividual = population[fitnessScores.index(bestIndividualFitnessScore)]
-        # print(f"Iteration {i}: FS = {bestIndividualFitnessScore}, BI: {bestIndividual}")
-        # print(f"{i+1} {bestIndividualFitnessScore}")
         print(f"{bestIndividualFitnessScore}")
 
 if __name__ == "__main__":
     # filePath = input("Type file path: ") #dane_AG/low-dimensional/f1_l-d_kp_10_269 #dane_AG/large_scale/knapPI_1_10000_1000_1
     populationSize, capacity, items = load_data("dane_AG/low-dimensional/f10_l-d_kp_20_879")
-    crossoverType = 1#int(input("Choose crossover type (1 - one-point, 2 - double-point): "))
+    crossoverType = int(input("Choose crossover type (1 - one-point, 2 - double-point): "))
     crossoverProbability = 0.65#float(input("Choose crossover probability (0.5-1.0): "))
     mutationRate = float(input("Choose mutation rate (0.0-0.1): "))
     iterationsNum = 500 #int(input("Type iterations number: "))
