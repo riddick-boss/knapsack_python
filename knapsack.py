@@ -2,7 +2,8 @@ import random
 
 def generate_population(itemsSize: int, populationSize: int) -> list[list[int]]:
     # generate population of len populationSize, with each individual of len itemsSize
-    return [[random.randint(0, 1) for _ in range(itemsSize)] for _ in range(populationSize)]
+    chanceToSelect = 0.01
+    return [[1 if chanceToSelect >= random.random() else 0 for _ in range(itemsSize)] for _ in range(populationSize)]
 
 def load_data(filePath: str):
     data: list[tuple[int, int]] = []
@@ -38,9 +39,7 @@ def two_point_crossover(parent1: list[int], parent2: list[int]):
     child2 = parent2[:point1] + parent1[point1:point2] + parent2[point2:]
     return child1, child2
 
-def performCrossover(parent1: list[int], parent2: list[int], crossoverProbability: float, crossoverType: int):
-    if(random.random() < crossoverProbability):
-        return parent1, parent2
+def performCrossover(parent1: list[int], parent2: list[int], crossoverType: int):
     if(crossoverType == 1):
         return single_point_crossover(parent1, parent2)
     elif(crossoverType == 2):
@@ -48,58 +47,66 @@ def performCrossover(parent1: list[int], parent2: list[int], crossoverProbabilit
     else: 
         raise Exception(f"Illegal crossover type selected ({crossoverType})!!!")
 
-def mutation(individual: list[int], mutationRate: float):
-    mutated = []
-    for gene in individual:
-        mGene = 1 - gene if random.random() < mutationRate else gene
-        mutated.append(mGene)
+def mutation(individual: list[int]):
+    idxToMutate = random.randint(0, len(individual) - 1)
+    mutated = individual.copy()
+    value = mutated[idxToMutate]
+    mutated[idxToMutate] = 0 if value == 1 else 1
     return mutated
 
-def rouletteSelection(population: list[list[int]], fitnessScores: list[int]) -> list[int]:
+def rouletteSelection(population: list[list[int]], populationSize: int, fitnessScores: list[int]) -> list[list[int]]:
     totalFitness = sum(fitnessScores)
-    threshold = random.randint(0, totalFitness)
-    currentFitness = 0
-    for individual, fitness in zip(population, fitnessScores):
-        currentFitness += fitness
-        if currentFitness >= threshold:
-            return individual
-        
-def rankSelection(population: list[list[int]], fitnessScores: list[int]) -> list[int]:
-    scored = zip(population, fitnessScores)
-    sortedInidviduals = [ind for ind, _ in sorted(scored, key=lambda tup : tup[1])]
+    updatedPopulation: list[list[int]] = []
 
-    #generate ranks [0.1, 0.3, 0.6]
-    ranks = range(1, len(population) + 1)
-    totalRank = sum(ranks)
-    probabilities = [rank / totalRank for rank in ranks]
+    while(len(updatedPopulation) < populationSize):
+        for individual, fitness in zip(population, fitnessScores):
+            if totalFitness == 0:
+                randomIndex = random.randint(0, len(population) - 1)
+                updatedPopulation.append(population[randomIndex])
+            else:
+                rouletteChance = fitness / totalFitness
+                threshold = random.random()
+                if(rouletteChance >= threshold):
+                    updatedPopulation.append(individual)
 
-    # Cumulate probabilities [0.1, 0.4, 1.0]
-    cumulativeProbabilities = []
-    cumulative = 0
-    for probability in probabilities:
-        cumulative += probability
-        cumulativeProbabilities.append(cumulative)
+            if(len(updatedPopulation) == populationSize):
+                return updatedPopulation
 
-    threshold = random.uniform(0.15, 1)
-    for individual, cumulativeProb in zip(sortedInidviduals, cumulativeProbabilities):
-        if cumulativeProb >= threshold:
-            return individual
+    return updatedPopulation
 
-def tournamentSelection(population: list[list[int]], fitnessScores: list[int]) -> list[int]:
-    k = 50
-    start = random.randint(0, len(population) - k)
-    
-    group = list(zip(population, fitnessScores))[start:start+k]
-    bestInd, _ = max(group, key=lambda x: x[1])
-    return bestInd
+def rankSelection(population: list[list[int]], populationSize: int, fitnessScores: list[int]) -> list[list[int]]:
+    updatedPopulation: list[list[int]] = []
+    ordered = [ind for ind, _ in sorted(zip(population, fitnessScores), key=lambda tup : tup[1])]
+    while(len(updatedPopulation) < populationSize):
+        for index in range(populationSize, 0, -1):
+            rank = index / populationSize
+            individualsNumToSelect = int((1/3) * populationSize * rank)
+            individualToTake = ordered[-(index-populationSize+1)]
+            updatedPopulation.extend([individualToTake] * individualsNumToSelect)
+            
+            if(len(updatedPopulation) >= populationSize):
+                return updatedPopulation[:populationSize]
 
-def performSelection(population: list[list[int]], fitnessScores: list[int], selectionType: int) -> list[int]:
+    return updatedPopulation[:populationSize]
+
+def tournamentSelection(population: list[list[int]], populationSize: int, fitnessScores: list[int]) -> list[list[int]]:
+    updatedPopulation: list[list[int]] = []
+    k = int(populationSize * 0.6)
+    for _ in range(populationSize):       
+        start = random.randint(0, len(population) - k)
+        group = list(zip(population, fitnessScores))[start:start+k]
+        bestIndividual, _ = max(group, key=lambda x: x[1])
+        updatedPopulation.append(bestIndividual)
+
+    return updatedPopulation[:populationSize]
+
+def performSelection(population: list[list[int]], populationSize: int, fitnessScores: list[int], selectionType: int) -> list[list[int]]:
     if(selectionType == 1):
-        return rouletteSelection(population, fitnessScores)
+        return rouletteSelection(population, populationSize, fitnessScores)
     elif(selectionType == 2):
-        return rankSelection(population, fitnessScores)
+        return rankSelection(population, populationSize, fitnessScores)
     elif(selectionType == 3):
-        return tournamentSelection(population, fitnessScores)
+        return tournamentSelection(population, populationSize, fitnessScores)
     else:
         raise Exception(f"Illegal seelction type selected ({selectionType})!!!")
 
@@ -114,20 +121,25 @@ def run_genetic(
         items: list[tuple[int, int]]
 ):
     population = generate_population(len(items), populationSize)
-    fitnessScores = [calculate_fitness(individual, items, capacity) for individual in population]
 
     for i in range(iterationsNum):
-        newPopulation = []
+        crossoverPopulation = population.copy()
         # to make sure we are creating new popultion of the required size
-        while(len(newPopulation) < populationSize):
-            parent1 = performSelection(population, fitnessScores, selectionType)
-            parent2 = performSelection(population, fitnessScores, selectionType)
-            child1, child2 = performCrossover(parent1, parent2, crossoverProbability, crossoverType)
-            newPopulation.append(mutation(child1, mutationRate))
-            newPopulation.append(mutation(child2, mutationRate))
-        # to make sure we are replacing with same size
-        population = newPopulation[:populationSize]
-        fitnessScores = [calculate_fitness(individual, items, capacity) for individual in population]
+        for individual in population:
+            if(crossoverProbability >= random.random()):
+                randomParent2Idx = random.randint(0, len(population) - 1)
+                child1, child2 = performCrossover(individual, population[randomParent2Idx], crossoverType)
+                crossoverPopulation.append(child1)
+                crossoverPopulation.append(child2)
+
+        mutatedPopulation = crossoverPopulation.copy()
+        for individual in mutatedPopulation:
+            if(mutationRate >= random.random()):
+                mutatedPopulation.append(mutation(individual))
+
+        fitnessScores = [calculate_fitness(individual, items, capacity) for individual in mutatedPopulation]
+        population = performSelection(mutatedPopulation, populationSize, fitnessScores, selectionType)
+
         bestIndividualFitnessScore = max(fitnessScores)
         # bestIndividual = population[fitnessScores.index(bestIndividualFitnessScore)]
         # print(f"Iteration {i}: FS = {bestIndividualFitnessScore}, BI: {bestIndividual}")
@@ -135,19 +147,13 @@ def run_genetic(
         print(f"{bestIndividualFitnessScore}")
 
 if __name__ == "__main__":
-    # filePath = input("Type file path: ") #dane_AG/low-dimensional/f1_l-d_kp_10_269
-    populationSize, capacity, items = load_data("dane_AG/large_scale/knapPI_1_10000_1000_1")
+    # filePath = input("Type file path: ") #dane_AG/low-dimensional/f1_l-d_kp_10_269 #dane_AG/large_scale/knapPI_1_10000_1000_1
+    populationSize, capacity, items = load_data("dane_AG/low-dimensional/f10_l-d_kp_20_879")
     crossoverType = 1#int(input("Choose crossover type (1 - one-point, 2 - double-point): "))
     crossoverProbability = 0.65#float(input("Choose crossover probability (0.5-1.0): "))
     mutationRate = float(input("Choose mutation rate (0.0-0.1): "))
     iterationsNum = 500 #int(input("Type iterations number: "))
     selectionType = int(input("Choose selection type (1-roulette, 2-ranking, 3-tournament): "))
-
-    # print(f"Population size: {populationSize}")
-    # print(f"Capacity: {capacity}")
-    # print(f"Items: {items}")
-    # print(f"Crossover type: {crossoverType}")
-    # print("--------------------------------------")
 
     run_genetic(
         populationSize=populationSize,
